@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日名言 - Daily Quotes</title>
+    <meta name="description" content="每次刷新获取一条随机的名人名言，启发您的人生">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>每日名言</h1>
+            <p class="subtitle">每一句话都有改变人生的力量</p>
+        </header>
+        
+        <main class="quote-container">
+            <div class="quote-card">
+                <div class="quote-text" id="quoteText">
+                    正在加载名言...
+                </div>
+                <div class="quote-author" id="quoteAuthor">
+                    --
+                </div>
+            </div>
+            
+            <div class="actions">
+                <button id="newQuoteBtn" class="btn-primary">
+                    <span>🎲</span>
+                    换一句
+                </button>
+                <button id="shareBtn" class="btn-secondary">
+                    <span>📋</span>
+                    复制分享
+                </button>
+            </div>
+        </main>
+        
+        <footer>
+            <p>共收录 <span id="totalQuotes">--</span> 条名言</p>
+            <p>Made with ❤️ for daily inspiration</p>
+        </footer>
+    </div>
+    
+    <div class="toast" id="toast">
+        名言已复制到剪贴板！
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
