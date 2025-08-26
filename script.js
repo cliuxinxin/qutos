@@ -1,294 +1,143 @@
 // 全局变量
 let quotesData = [];
 let currentQuote = null;
-let isDataLoaded = false;
+let pool = [];
 
 // DOM 元素
-const quoteText = document.getElementById('quoteText');
-const quoteAuthor = document.getElementById('quoteAuthor');
-const newQuoteBtn = document.getElementById('newQuoteBtn');
-const shareBtn = document.getElementById('shareBtn');
-const totalQuotesSpan = document.getElementById('totalQuotes');
-const toast = document.getElementById('toast');
+const card = document.getElementById('card');
+const $text = document.getElementById('text');
+const $author = document.getElementById('author');
+const $source = document.getElementById('source');
 
 // 页面加载完成后执行
 document.addEventListener('DOMContentLoaded', function() {
-    setupEventListeners();
     initializeApp();
 });
 
 // 初始化应用
 async function initializeApp() {
-    showLoadingState();
-    
-    // 检查本地存储是否有缓存数据
-    const cachedData = localStorage.getItem('quotesCache');
-    const cacheTimestamp = localStorage.getItem('quotesCacheTimestamp');
-    
-    // 如果缓存存在且未过期（24小时内），使用缓存
-    if (cachedData && cacheTimestamp && (Date.now() - parseInt(cacheTimestamp)) < 24 * 60 * 60 * 1000) {
-        try {
-            const data = JSON.parse(cachedData);
-            quotesData = data.quotes;
-            isDataLoaded = true;
-            updateTotalCount();
-            displayRandomQuote();
-            hideLoadingState();
-            console.log('使用缓存数据，名言数量:', quotesData.length);
-            return;
-        } catch (error) {
-            console.warn('缓存数据解析失败，重新加载:', error);
-        }
-    }
-    
-    // 加载远程数据
     await loadQuotes();
+    next(); // 显示第一条名言
 }
 
-// 加载名言数据（分块加载优化）
+// 加载名言数据
 async function loadQuotes() {
     try {
-        showProgressBar();
-        
         const response = await fetch('qutos.json');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let chunks = [];
-        let receivedLength = 0;
-        const contentLength = +response.headers.get('Content-Length');
+        const data = await response.json();
         
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            chunks.push(value);
-            receivedLength += value.length;
-            
-            // 更新进度条
-            if (contentLength) {
-                const progress = (receivedLength / contentLength) * 100;
-                updateProgressBar(progress);
-            }
-        }
+        // 转换数据格式以兼容 protype.html 的格式
+        quotesData = data.quotes.map(item => ({
+            text: item.quote,
+            author: item.author,
+            lang: detectLanguage(item.quote),
+            source: '' // 你的原始数据没有source字段
+        }));
         
-        // 合并所有chunks并解析JSON
-        const chunksAll = new Uint8Array(receivedLength);
-        let position = 0;
-        for (let chunk of chunks) {
-            chunksAll.set(chunk, position);
-            position += chunk.length;
-        }
-        
-        const result = decoder.decode(chunksAll);
-        const data = JSON.parse(result);
-        
-        quotesData = data.quotes;
-        isDataLoaded = true;
-        
-        // 缓存到本地存储
-        localStorage.setItem('quotesCache', JSON.stringify(data));
-        localStorage.setItem('quotesCacheTimestamp', Date.now().toString());
-        
-        updateTotalCount();
-        displayRandomQuote();
-        hideLoadingState();
-        hideProgressBar();
+        // 初始化随机引擎
+        pool = [...quotesData];
         
         console.log(`成功加载 ${quotesData.length} 条名言`);
         
     } catch (error) {
         console.error('加载名言数据失败:', error);
-        showErrorState('抱歉，无法加载名言数据。请检查网络连接或稍后重试。');
-        hideProgressBar();
+        toast('数据加载失败，请检查网络连接');
+        quotesData = [];
+        pool = [];
     }
 }
 
-// 显示随机名言
-function displayRandomQuote() {
-    if (!isDataLoaded || quotesData.length === 0) {
-        return;
+// 语言检测函数
+function detectLanguage(text) {
+    // 简单的中文检测
+    return /[\u4e00-\u9fff]/.test(text) ? 'zh' : 'en';
+}
+
+// 随机引擎：无重复轮询
+function pick() {
+    if (pool.length === 0) pool = [...quotesData];
+    const i = crypto.getRandomValues(new Uint32Array(1))[0] % pool.length;
+    const item = pool.splice(i, 1)[0];
+    return item;
+}
+
+// 渲染名言
+function render(q) {
+    if (card.classList.contains('show')) card.classList.remove('show');
+    $text.textContent = q.text;
+    $text.setAttribute('data-lang', q.lang || '');
+    $author.textContent = q.author ? `— ${q.author}` : '';
+    $source.textContent = q.source ? q.source : '';
+    currentQuote = q;
+    requestAnimationFrame(() => { card.classList.add('show'); });
+}
+
+// 动作函数
+function next() { 
+    render(pick()); 
+}
+
+function copy() {
+    const payload = [$text.textContent, $author.textContent].filter(Boolean).join('\n');
+    navigator.clipboard?.writeText(payload).then(() => toast('已复制')).catch(() => toast('无法复制'));
+}
+
+function speak() {
+    if (!('speechSynthesis' in window)) return toast('设备不支持朗读');
+    window.speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance([$text.textContent, $author.textContent].join(' '));
+    // 简单的语言猜测
+    utter.lang = ($text.getAttribute('data-lang') === 'zh') ? 'zh-CN' : 'en-US';
+    window.speechSynthesis.speak(utter);
+}
+
+// 轻提示
+let toastTimer;
+function toast(msg) {
+    clearTimeout(toastTimer);
+    let el = document.getElementById('toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'toast';
+        Object.assign(el.style, {
+            position: 'fixed', left: '50%', bottom: '28px', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.75)', color: '#fff', padding: '10px 14px', borderRadius: '999px',
+            fontSize: '14px', zIndex: 9999, opacity: 0, transition: 'opacity .25s ease'
+        });
+        document.body.appendChild(el);
     }
-    
-    // 添加加载动画
-    const quoteCard = document.querySelector('.quote-card');
-    quoteCard.classList.add('loading');
-    
-    // 获取随机索引
-    const randomIndex = Math.floor(Math.random() * quotesData.length);
-    currentQuote = quotesData[randomIndex];
-    
-    // 更新显示内容
-    quoteText.textContent = currentQuote.quote;
-    quoteAuthor.textContent = `—— ${currentQuote.author}`;
-    
-    // 移除加载动画
-    setTimeout(() => {
-        quoteCard.classList.remove('loading');
-    }, 600);
-    
-    console.log(`显示名言 #${currentQuote.id}: ${currentQuote.author}`);
+    el.textContent = msg; 
+    el.style.opacity = 1;
+    toastTimer = setTimeout(() => { el.style.opacity = 0; }, 1200);
 }
 
-// 更新总数显示
-function updateTotalCount() {
-    totalQuotesSpan.textContent = quotesData.length.toLocaleString();
-}
+// 事件监听
+document.getElementById('newBtn').addEventListener('click', next);
+document.getElementById('copyBtn').addEventListener('click', copy);
+document.getElementById('speakBtn').addEventListener('click', speak);
 
-// 显示加载状态
-function showLoadingState() {
-    quoteText.innerHTML = '<span class="loading-spinner"></span> 正在加载名言数据...';
-    quoteAuthor.textContent = '--';
-    newQuoteBtn.disabled = true;
-    shareBtn.disabled = true;
-}
-
-// 隐藏加载状态
-function hideLoadingState() {
-    newQuoteBtn.disabled = false;
-    shareBtn.disabled = false;
-}
-
-// 显示错误状态
-function showErrorState(message) {
-    quoteText.textContent = message;
-    quoteAuthor.textContent = '系统提示';
-    totalQuotesSpan.textContent = '0';
-}
-
-// 显示进度条
-function showProgressBar() {
-    let progressBar = document.getElementById('progressBar');
-    if (!progressBar) {
-        progressBar = document.createElement('div');
-        progressBar.id = 'progressBar';
-        progressBar.className = 'progress-bar';
-        progressBar.innerHTML = '<div class="progress-fill"></div>';
-        document.querySelector('.quote-container').prepend(progressBar);
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') { 
+        e.preventDefault(); 
+        next(); 
     }
-    progressBar.style.display = 'block';
-}
-
-// 更新进度条
-function updateProgressBar(progress) {
-    const progressFill = document.querySelector('.progress-fill');
-    if (progressFill) {
-        progressFill.style.width = Math.min(progress, 100) + '%';
+    if (e.key === 'c' || e.key === 'C') { 
+        copy(); 
     }
-}
-
-// 隐藏进度条
-function hideProgressBar() {
-    const progressBar = document.getElementById('progressBar');
-    if (progressBar) {
-        progressBar.style.display = 'none';
+    if (e.key === 's' || e.key === 'S') { 
+        speak(); 
     }
-}
-
-// 复制到剪贴板
-async function copyToClipboard() {
-    if (!currentQuote) {
-        return;
-    }
-    
-    const textToCopy = `"${currentQuote.quote}" —— ${currentQuote.author}`;
-    
-    try {
-        // 现代浏览器使用 Clipboard API
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(textToCopy);
-            showToast('名言已复制到剪贴板！');
-        } else {
-            // 降级方案：使用传统方法
-            const textArea = document.createElement('textarea');
-            textArea.value = textToCopy;
-            textArea.style.position = 'fixed';
-            textArea.style.opacity = '0';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            
-            const successful = document.execCommand('copy');
-            document.body.removeChild(textArea);
-            
-            if (successful) {
-                showToast('名言已复制到剪贴板！');
-            } else {
-                showToast('复制失败，请手动复制', 'error');
-            }
-        }
-    } catch (error) {
-        console.error('复制失败:', error);
-        showToast('复制失败，请手动复制', 'error');
-    }
-}
-
-// 显示提示消息
-function showToast(message, type = 'success') {
-    toast.textContent = message;
-    toast.className = `toast ${type}`;
-    toast.classList.add('show');
-    
-    setTimeout(() => {
-        toast.classList.remove('show');
-    }, 3000);
-}
-
-// 设置事件监听器
-function setupEventListeners() {
-    // 换一句按钮
-    newQuoteBtn.addEventListener('click', function() {
-        if (isDataLoaded) {
-            displayRandomQuote();
-        } else {
-            showToast('数据正在加载中，请稍候...', 'error');
-        }
-    });
-    
-    // 复制分享按钮
-    shareBtn.addEventListener('click', function() {
-        if (isDataLoaded && currentQuote) {
-            copyToClipboard();
-        } else {
-            showToast('请等待数据加载完成', 'error');
-        }
-    });
-    
-    // 键盘快捷键
-    document.addEventListener('keydown', function(event) {
-        // 按空格键或回车键换一句
-        if ((event.code === 'Space' || event.code === 'Enter') && isDataLoaded) {
-            event.preventDefault();
-            displayRandomQuote();
-        }
-        // 按 C 键复制
-        if (event.code === 'KeyC' && (event.ctrlKey || event.metaKey) && isDataLoaded && currentQuote) {
-            event.preventDefault();
-            copyToClipboard();
-        }
-    });
-    
-    // 点击名言卡片也可以换一句
-    document.querySelector('.quote-card').addEventListener('click', function() {
-        if (isDataLoaded) {
-            displayRandomQuote();
-        }
-    });
-}
-
-// 页面刷新时自动换一句（可选功能）
-window.addEventListener('beforeunload', function() {
-    // 在页面即将刷新时，可以在这里添加一些清理工作
-    console.log('页面即将刷新');
 });
 
 // 导出函数供其他脚本使用（如果需要）
 window.QuoteApp = {
-    displayRandomQuote,
-    copyToClipboard,
+    next,
+    copy,
+    speak,
     getCurrentQuote: () => currentQuote,
     getTotalQuotes: () => quotesData.length
 };

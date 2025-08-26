@@ -1,52 +1,98 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>每日名言 - Daily Quotes</title>
-    <meta name="description" content="每次刷新获取一条随机的名人名言，启发您的人生">
-    <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>启言 · 随机名人名言</title>
+  <meta name="description" content="极简、专注、易分享的随机名言网页。" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c" />
+  <style>
+    :root{
+      --bg: #ffffff;
+      --fg: #0b0b0c;
+      --muted: #6a6a6a;
+      --card: #f4f4f5;
+      --accent: #0a84ff;
+      --ring: rgba(10,132,255,0.35);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#0b0b0c; --fg:#f5f5f7; --muted:#a1a1a6; --card:#161617; --accent:#0a84ff; --ring:rgba(10,132,255,0.35); }
+    }
+    *{ box-sizing: border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0; background:var(--bg); color:var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans", sans-serif;
+      line-height:1.5;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    main{ min-height:100%; display:grid; grid-template-rows:auto 1fr auto; gap:24px; padding:32px 20px; max-width:900px; margin:0 auto; }
+    header, footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    header .brand{ font-weight:700; letter-spacing:0.2px; }
+    header .brand span{ opacity:.6; font-weight:600; }
+
+    .card{
+      background:var(--card); border-radius:24px; padding:32px; 
+      box-shadow: 0 1px 1px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.07);
+      display:flex; flex-direction:column; justify-content:center; min-height:50vh;
+    }
+    blockquote{ margin:0; }
+    .quote-text{
+      font-size: clamp(22px, 4.2vw, 42px);
+      font-weight: 700; letter-spacing: 0.2px; 
+    }
+    .quote-text[data-lang="en"]{ font-weight: 800; }
+    .author{ margin-top:16px; font-size: clamp(14px, 1.8vw, 18px); color:var(--muted); }
+    .source{ margin-top:8px; font-size: 14px; color:var(--muted); opacity:.8; }
+
+    .toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    button.icon{
+      appearance:none; border:1px solid transparent; background: var(--fg); color: var(--bg);
+      padding:12px 14px; border-radius:999px; font-weight:700; cursor:pointer;
+      transition: transform .08s ease;
+    }
+    button.icon.secondary{ background: transparent; color: var(--fg); border-color: rgba(127,127,127,0.25); }
+    button.icon:active{ transform: scale(0.98); }
+    button.icon:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--ring); }
+
+    .hint{ color:var(--muted); font-size:13px; }
+    .spacer{ flex:1; }
+    a.muted{ color:var(--muted); text-decoration:none; }
+    a.muted:hover{ text-decoration:underline; }
+
+    @media (prefers-reduced-motion: no-preference){
+      .fade{ opacity:0; transform: translateY(6px); transition: opacity .35s ease, transform .35s ease; }
+      .fade.show{ opacity:1; transform: translateY(0); }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>每日名言</h1>
-            <p class="subtitle">每一句话都有改变人生的力量</p>
-        </header>
-        
-        <main class="quote-container">
-            <div class="quote-card">
-                <div class="quote-text" id="quoteText">
-                    正在加载名言...
-                </div>
-                <div class="quote-author" id="quoteAuthor">
-                    --
-                </div>
-            </div>
-            
-            <div class="actions">
-                <button id="newQuoteBtn" class="btn-primary">
-                    <span>🎲</span>
-                    换一句
-                </button>
-                <button id="shareBtn" class="btn-secondary">
-                    <span>📋</span>
-                    复制分享
-                </button>
-            </div>
-        </main>
-        
-        <footer>
-            <p>共收录 <span id="totalQuotes">--</span> 条名言</p>
-            <p>Made with ❤️ for daily inspiration</p>
-        </footer>
-    </div>
-    
-    <div class="toast" id="toast">
-        名言已复制到剪贴板！
-    </div>
-    
-    <script src="script.js"></script>
+  <main>
+    <header>
+      <div class="brand">启言 <span>Yi · Yan</span></div>
+      <div class="toolbar">
+        <button class="icon secondary" id="speakBtn" aria-label="朗读当前名言">朗读</button>
+        <button class="icon secondary" id="copyBtn" aria-label="复制当前名言">复制</button>
+        <button class="icon" id="newBtn" aria-label="下一条">下一条</button>
+      </div>
+    </header>
+
+    <section class="card fade" id="card">
+      <blockquote>
+        <div id="text" class="quote-text"></div>
+        <div class="author" id="author"></div>
+        <div class="source" id="source"></div>
+      </blockquote>
+    </section>
+
+    <footer>
+      <div class="hint">空格键：下一条 · C：复制 · S：朗读</div>
+      <div class="spacer"></div>
+      <a class="muted" href="#" id="shuffleInfo" aria-label="随机模式">随机 · 无重复</a>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>

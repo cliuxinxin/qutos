@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>启言 · 随机名人名言</title>
+  <meta name="description" content="极简、专注、易分享的随机名言网页。" />
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c" />
+  <style>
+    :root{
+      --bg: #ffffff;
+      --fg: #0b0b0c;
+      --muted: #6a6a6a;
+      --card: #f4f4f5;
+      --accent: #0a84ff;
+      --ring: rgba(10,132,255,0.35);
+    }
+    @media (prefers-color-scheme: dark){
+      :root{ --bg:#0b0b0c; --fg:#f5f5f7; --muted:#a1a1a6; --card:#161617; --accent:#0a84ff; --ring:rgba(10,132,255,0.35); }
+    }
+    *{ box-sizing: border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0; background:var(--bg); color:var(--fg);
+      font-family: ui-sans-serif, system-ui, -apple-system, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Helvetica, Arial, "Noto Sans CJK SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans", sans-serif;
+      line-height:1.5;
+      -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+    }
+    main{ min-height:100%; display:grid; grid-template-rows:auto 1fr auto; gap:24px; padding:32px 20px; max-width:900px; margin:0 auto; }
+    header, footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    header .brand{ font-weight:700; letter-spacing:0.2px; }
+    header .brand span{ opacity:.6; font-weight:600; }
+
+    .card{
+      background:var(--card); border-radius:24px; padding:32px; 
+      box-shadow: 0 1px 1px rgba(0,0,0,0.06), 0 8px 30px rgba(0,0,0,0.07);
+      display:flex; flex-direction:column; justify-content:center; min-height:50vh;
+    }
+    blockquote{ margin:0; }
+    .quote-text{
+      font-size: clamp(22px, 4.2vw, 42px);
+      font-weight: 700; letter-spacing: 0.2px; 
+    }
+    .quote-text[data-lang="en"]{ font-weight: 800; }
+    .author{ margin-top:16px; font-size: clamp(14px, 1.8vw, 18px); color:var(--muted); }
+    .source{ margin-top:8px; font-size: 14px; color:var(--muted); opacity:.8; }
+
+    .toolbar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    button.icon{
+      appearance:none; border:1px solid transparent; background: var(--fg); color: var(--bg);
+      padding:12px 14px; border-radius:999px; font-weight:700; cursor:pointer;
+      transition: transform .08s ease;
+    }
+    button.icon.secondary{ background: transparent; color: var(--fg); border-color: rgba(127,127,127,0.25); }
+    button.icon:active{ transform: scale(0.98); }
+    button.icon:focus-visible{ outline:none; box-shadow: 0 0 0 4px var(--ring); }
+
+    .hint{ color:var(--muted); font-size:13px; }
+    .spacer{ flex:1; }
+    a.muted{ color:var(--muted); text-decoration:none; }
+    a.muted:hover{ text-decoration:underline; }
+
+    @media (prefers-reduced-motion: no-preference){
+      .fade{ opacity:0; transform: translateY(6px); transition: opacity .35s ease, transform .35s ease; }
+      .fade.show{ opacity:1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand">启言 <span>Yi · Yan</span></div>
+      <div class="toolbar">
+        <button class="icon secondary" id="speakBtn" aria-label="朗读当前名言">朗读</button>
+        <button class="icon secondary" id="copyBtn" aria-label="复制当前名言">复制</button>
+        <button class="icon" id="newBtn" aria-label="下一条">下一条</button>
+      </div>
+    </header>
+
+    <section class="card fade" id="card">
+      <blockquote>
+        <div id="text" class="quote-text"></div>
+        <div class="author" id="author"></div>
+        <div class="source" id="source"></div>
+      </blockquote>
+    </section>
+
+    <footer>
+      <div class="hint">空格键：下一条 · C：复制 · S：朗读</div>
+      <div class="spacer"></div>
+      <a class="muted" href="#" id="shuffleInfo" aria-label="随机模式">随机 · 无重复</a>
+    </footer>
+  </main>
+
+  <script>
+    // —— 数据：可替换为你的名言库（建议：text, author, lang, source）——
+    const QUOTES = [
+      { text: "Stay hungry, stay foolish.", author: "Steve Jobs", lang: "en", source: "Stanford Commencement, 2005" },
+      { text: "Simplicity is the ultimate sophistication.", author: "Leonardo da Vinci", lang: "en" },
+      { text: "知之者不如好之者，好之者不如乐之者。", author: "孔子", lang: "zh", source: "《论语》" },
+      { text: "The only limit to our realization of tomorrow is our doubts of today.", author: "Franklin D. Roosevelt", lang: "en" },
+      { text: "不积跬步，无以至千里。", author: "荀子", lang: "zh", source: "《劝学》" },
+      { text: "Be yourself; everyone else is already taken.", author: "Oscar Wilde", lang: "en" },
+      { text: "大道至简。", author: "老子", lang: "zh", source: "传" },
+      { text: "In the middle of difficulty lies opportunity.", author: "Albert Einstein", lang: "en" },
+      { text: "行胜于言。", author: "王充", lang: "zh" },
+      { text: "The future belongs to those who prepare for it today.", author: "Malcolm X", lang: "en" },
+      { text: "苟日新，日日新，又日新。", author: "《大学》", lang: "zh" },
+      { text: "If you can't explain it simply, you don't understand it well enough.", author: "Albert Einstein", lang: "en" }
+    ];
+
+    // —— 随机引擎：无重复轮询 ——
+    let pool = [...QUOTES];
+    function pick(){
+      if(pool.length === 0) pool = [...QUOTES];
+      const i = crypto.getRandomValues(new Uint32Array(1))[0] % pool.length;
+      const item = pool.splice(i,1)[0];
+      return item;
+    }
+
+    // —— 渲染 ——
+    const card = document.getElementById('card');
+    const $text = document.getElementById('text');
+    const $author = document.getElementById('author');
+    const $source = document.getElementById('source');
+    function render(q){
+      if(card.classList.contains('show')) card.classList.remove('show');
+      $text.textContent = q.text;
+      $text.setAttribute('data-lang', q.lang || '');
+      $author.textContent = q.author ? `— ${q.author}` : '';
+      $source.textContent = q.source ? q.source : '';
+      requestAnimationFrame(()=>{ card.classList.add('show'); });
+    }
+
+    // —— 动作 ——
+    function next(){ render(pick()); }
+    function copy(){
+      const payload = [$text.textContent, $author.textContent].filter(Boolean).join('\n');
+      navigator.clipboard?.writeText(payload).then(()=>toast('已复制')).catch(()=>toast('无法复制'));
+    }
+    function speak(){
+      if(!('speechSynthesis' in window)) return toast('设备不支持朗读');
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance([$text.textContent, $author.textContent].join(' '));
+      // 简单的语言猜测
+      utter.lang = ($text.getAttribute('data-lang') === 'zh') ? 'zh-CN' : 'en-US';
+      window.speechSynthesis.speak(utter);
+    }
+
+    // —— 轻提示 ——
+    let toastTimer;
+    function toast(msg){
+      clearTimeout(toastTimer);
+      let el = document.getElementById('toast');
+      if(!el){
+        el = document.createElement('div');
+        el.id = 'toast';
+        Object.assign(el.style,{
+          position:'fixed',left:'50%',bottom:'28px',transform:'translateX(-50%)',
+          background:'rgba(0,0,0,0.75)',color:'#fff',padding:'10px 14px',borderRadius:'999px',
+          fontSize:'14px',zIndex:9999,opacity:0,transition:'opacity .25s ease'
+        });
+        document.body.appendChild(el);
+      }
+      el.textContent = msg; el.style.opacity = 1;
+      toastTimer = setTimeout(()=>{ el.style.opacity = 0; }, 1200);
+    }
+
+    // —— 事件 ——
+    document.getElementById('newBtn').addEventListener('click', next);
+    document.getElementById('copyBtn').addEventListener('click', copy);
+    document.getElementById('speakBtn').addEventListener('click', speak);
+    document.addEventListener('keydown', (e)=>{
+      if(e.code === 'Space'){ e.preventDefault(); next(); }
+      if(e.key === 'c' || e.key === 'C'){ copy(); }
+      if(e.key === 's' || e.key === 'S'){ speak(); }
+    });
+
+    // —— 初始 ——
+    next();
+  </script>
+</body>
+</html>
