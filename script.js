@@ -23,7 +23,10 @@ async function initializeApp() {
 // 加载名言数据
 async function loadQuotes() {
     try {
-        const response = await fetch('qutos.json');
+        // 修复GitHub Pages路径问题 - 使用绝对路径
+        const basePath = window.location.pathname.includes('/qutos/') ? '/qutos/' : '/';
+        const response = await fetch(`${basePath}qutos.json`);
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -45,6 +48,8 @@ async function loadQuotes() {
         
     } catch (error) {
         console.error('加载名言数据失败:', error);
+        console.log('当前URL:', window.location.href);
+        console.log('尝试加载的路径:', `${window.location.pathname.includes('/qutos/') ? '/qutos/' : '/'}qutos.json`);
         toast('数据加载失败，请检查网络连接');
         quotesData = [];
         pool = [];
